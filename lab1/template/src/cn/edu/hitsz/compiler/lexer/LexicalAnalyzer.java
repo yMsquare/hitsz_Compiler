@@ -3,10 +3,10 @@ package cn.edu.hitsz.compiler.lexer;
 import cn.edu.hitsz.compiler.NotImplementedException;
 import cn.edu.hitsz.compiler.symtab.SymbolTable;
 import cn.edu.hitsz.compiler.utils.FileUtils;
-
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.sql.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.StreamSupport;
@@ -22,56 +22,34 @@ import java.util.stream.StreamSupport;
 public class LexicalAnalyzer {
     private final SymbolTable symbolTable;
     //创建符号表
-    public LexicalAnalyzer(SymbolTable symbolTable) {
+    public LexicalAnalyzer(SymbolTable symbolTable)
+    {
         this.symbolTable = symbolTable;
     }
-
-
     /**
      * 从给予的路径中读取并加载文件内容
      *
      * @param path 路径
      */
-    private  char[] buffer;
-    private int bufferSize = 1024;
-    private  int pos = 0;
-    private  int bytesRead = 0;
+//    private  char[] buffer;
+//    private int bufferSize = 1024;
+//    private  int pos = 0;
+//    private  int bytesRead = 0;
+    public List<Token> tokens = new ArrayList<>();
+    public String inputString = "";
     private FileInputStream fileInputStream;
     public void loadFile(String path) {
-        // TODO: 词法分析前的缓冲区实现
-        try{
-            fileInputStream = new FileInputStream(path);
-            buffer = new char[bufferSize];
-            fillBuffer();
-        }catch(IOException e){
-            e.printStackTrace();
-        }
-        // 可自由实现各类缓冲区
-        // 或直接采用完整读入方法
-        throw new NotImplementedException();
-    }
-    //填充缓冲区
-    private void fillBuffer() throws IOException {
-        byte[] bytesBuffer = new byte[bufferSize];
-        bytesRead = fileInputStream.read(bytesBuffer);
-        if(bytesRead != -1){
-            for (int i = 0; i< bytesRead;i++){
-                buffer[i] = (char)bytesBuffer[i];
+        // 词法分析前的缓冲区实现
+        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                inputString += line;
             }
+            //System.out.println(sourceString);
+        } catch (IOException e){
+            throw new RuntimeException(e);
         }
     }
-    //逐字符读取下一个
-    private char nextChar() throws IOException {
-        if(pos >= bytesRead){
-            fillBuffer();
-            if(bytesRead == -1){
-                return '\0';
-            }
-            pos = 0;
-        }
-        return buffer[pos++];
-    }
-
     /**
      * 执行词法分析, 准备好用于返回的 token 列表 <br>
      * 需要维护实验一所需的符号表条目, 而得在语法分析中才能确定的符号表条目的成员可以先设置为 null
@@ -98,21 +76,16 @@ public class LexicalAnalyzer {
     private StringBuilder currentIdentifier,currentNumber;
     public void run() {
         // TODO: 自动机实现的词法分析过程
+        int i = 0;
+        char ch;
+        char[] word = inputString.toCharArray();
         currentIdentifier = new StringBuilder();
         currentNumber = new StringBuilder();
         currentState = STATES.IDLE;
         //main 中调用了loadfile
         List<Token> tokens = new ArrayList<>();
-        char ch;
-        while (ch != '\0') {
-            try {
-                ch = nextChar();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-            if(ch == '\0'){
-                break;
-            }
+        while (i < inputString.length()) {
+            ch = word[i];
             //现态到次态的转变
             switch (currentState) {
                 case IDLE: {
@@ -120,10 +93,6 @@ public class LexicalAnalyzer {
                         //特殊字符
                         currentState = STATES.SKIP;
                     }
-                    //else if (ch == ',' || ch == ';' || ch == '=' || ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '(' || ch == ')') {
-                        //仅判断一个字符便可以得出结果的情况
-                      //  currentState = STATES.FINAL;
-                   // }
                     else if (Character.isLetter(ch)) {
                         //关键字和标识符
                         currentState = STATES.LETTER;
@@ -189,7 +158,6 @@ public class LexicalAnalyzer {
                 case LETTER: {
                     if (Character.isLetter(ch)) {
                         currentState = STATES.LETTER;
-                        currentIdentifier.append(ch);
                     } else {
                         currentState = STATES.LETTER_END;
                     }
@@ -204,18 +172,53 @@ public class LexicalAnalyzer {
                     break;
                 }
                 case LETTER_END: {
-                    currentState = STATES.IDLE;
+                    if (Character.isDigit(ch)){
+                        currentState = STATES.DIGIT;
+                    }else if (Character.isLetter(ch)){
+                        currentState = STATES.LETTER;
+                    }else if (ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t') {
+                        currentState = STATES.SKIP;
+                    }else{
+                        currentState = STATES.IDLE;
+                    }
                     break;
                 }
                 case DIGIT_END:{
-                    currentState = STATES.IDLE;
+                    if (Character.isDigit(ch)){
+                        currentState = STATES.DIGIT;
+                    }else if (Character.isLetter(ch)){
+                        currentState = STATES.LETTER;
+                    }else if (ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t') {
+                        currentState = STATES.SKIP;
+                    }else{
+                        currentState = STATES.IDLE;
+                    }
+                    break;
+                }
+                case SKIP:{
+                    if (Character.isDigit(ch)){
+                        currentState = STATES.DIGIT;
+                    }else if (Character.isLetter(ch)){
+                        currentState = STATES.LETTER;
+                    }else if (ch == ' ' || ch == '\r' || ch == '\n' || ch == '\t') {
+                        currentState = STATES.SKIP;
+                    }else{
+                        currentState = STATES.IDLE;
+                    }
+                    break;
+                }
+                default:{
+                    currentState = STATES.ERROR;
                 }
             }
 
-
+            //状态机的输出
             switch (currentState) {
+                case IDLE:{
+                    break;
+                }
                 case SEMIC:{
-                    tokens.add(Token.simple("SEMIC"));
+                    tokens.add(Token.simple("Semicolon"));
                     break;
                 }
                 case EXP:{
@@ -223,7 +226,7 @@ public class LexicalAnalyzer {
                     break;
                 }
                 case MULTI:{
-                    tokens.add(Token.simple("MULTI"));
+                    tokens.add(Token.simple("*"));
                     break;
                 }
                 case ASSIGN:{
@@ -231,7 +234,7 @@ public class LexicalAnalyzer {
                     break;
                 }
                 case COLON:{
-                    tokens.add(Token.simple("COLON"));
+                    tokens.add(Token.simple(":"));
                     break;
                 }
                 case LE:{
@@ -247,7 +250,7 @@ public class LexicalAnalyzer {
                     break;
                 }
                 case EQ:{
-                    tokens.add(Token.simple("EQ"));
+                    tokens.add(Token.simple("="));
                     break;
                 }
                 case GE:{
@@ -259,36 +262,68 @@ public class LexicalAnalyzer {
                     break;
                 }
                 case ADD:{
-                    tokens.add(Token.simple("ADD"));
+                    tokens.add(Token.simple("+"));
                     break;
                 }
                 case MINUS:{
-                    tokens.add(Token.simple("MINUS"));
+                    tokens.add(Token.simple("-"));
                     break;
                 }
                 case RDIV:{
-                    tokens.add(Token.simple("RDIV"));
+                    tokens.add(Token.simple("/"));
                     break;
                 }
                 case COMMA:{
-                    tokens.add(Token.simple("COMMA"));
+                    tokens.add(Token.simple(","));
+                    break;
+                }
+                case LETTER:{
+                    currentIdentifier.append(ch);
+                    break;
+                }
+                case DIGIT:{
+                    currentNumber.append(ch);
                     break;
                 }
                 case DIGIT_END: {
-                    tokens.add(Token.simple(currentNumber.toString()));  // 添加标识符 Token
+                    tokens.add(Token.normal("IntConst", currentNumber.toString()));
+                    currentNumber.setLength(0);
                     break;
-                    //return
                 }
                 case LETTER_END: {
-                    tokens.add(Token.simple(currentIdentifier.toString()));  // 添加标识符 Token
+                    String key = currentIdentifier.toString();
+                    if (TokenKind.isAllowed(key)) {
+                        tokens.add(Token.simple(key));
+                    } else {
+                        //当前读入字符串为关键字
+                        tokens.add(Token.normal("id",key));
+                        if (!symbolTable.has(key)) {
+                            symbolTable.add(key);
+                        }
+                    }
+                    System.out.printf("%s\n",key);
+                    currentIdentifier.setLength(0);
+                    break;
+                }
+                case SKIP:{
+                    ++i;
+                    break;
+                }
+                case ERROR:{
+                    System.out.printf("error char : %c \n",ch);
                     break;
                 }
                 default:{
+                    System.out.printf("default branch \n");
                     break;
                 }
             }
-            throw new NotImplementedException();
-        }
+            ++i;
+            System.out.printf("current states: %s\n", currentState);
+            //throw new NotImplementedException();
+        }//while
+        //插入结束符
+        tokens.add(Token.eof());
     }
     /**
      * 获得词法分析的结果, 保证在调用了 run 方法之后调用
@@ -301,7 +336,8 @@ public class LexicalAnalyzer {
         // 词法分析过程可以使用 Stream 或 Iterator 实现按需分析
         // 亦可以直接分析完整个文件
         // 总之实现过程能转化为一列表即可
-        throw new NotImplementedException();
+        //throw new NotImplementedException();
+        return tokens;
     }
 
     public void dumpTokens(String path) {

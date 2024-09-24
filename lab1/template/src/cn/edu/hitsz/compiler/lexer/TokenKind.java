@@ -25,6 +25,7 @@ import java.util.Map;
  * @see cn.edu.hitsz.compiler.parser.table.NonTerminal 非终止符 - 可以通过产生式被其它项规约出来的项
  * @see cn.edu.hitsz.compiler.parser.table.Production 产生式 - BNF 语法描述的基本要素
  */
+
 public class TokenKind extends Term {
     // 允许用作 TokenKind 的 id 的字符串集合
     private static final Map<String, TokenKind> allowed = new HashMap<>();
@@ -62,7 +63,6 @@ public class TokenKind extends Term {
         if (allowed == null) {
             throw new RuntimeException("Empty allowed");
         }
-
         return allowed.containsKey(id);
     }
 
@@ -72,17 +72,16 @@ public class TokenKind extends Term {
     public static Map<String, TokenKind> allAllowedTokenKinds() {
         return Collections.unmodifiableMap(allowed);
     }
-
     /**
      * @param id 标识符
      * @return 从给定的标识符中构造出的 TokenKind
      * @throws RuntimeException 码点文件尚未被读取, 或该标识符不被允许作为 TokenKind 的标识符
      */
+
     public static TokenKind fromString(String id) {
         if (allowed == null || !allowed.containsKey(id)) {
             throw new RuntimeException("Illegal Identifier");
         }
-
         return allowed.get(id);
     }
 
